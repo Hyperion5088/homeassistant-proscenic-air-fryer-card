@@ -1,6 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
-const CARD_VERSION = "0.1.7";
+const CARD_VERSION = "0.1.8";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -326,6 +326,11 @@ class ProscenicAirFryerCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._deferRender) return;
+    if (this._hasOpenNativeSelect()) {
+      this._deferRender = true;
+      return;
+    }
     this.render();
   }
 
@@ -377,23 +382,18 @@ class ProscenicAirFryerCard extends HTMLElement {
             </div>
           </header>
 
-          <div class="hero">
-            <div class="dial ${isActive ? "active" : ""}">
-              <ha-icon icon="mdi:toaster-oven"></ha-icon>
+          <div class="readings">
+            <div class="reading">
+              <span>Preset</span>
+              <strong>${this.entityStateText(entities.preset) || this.entityStateText(entities.mode) || "Manual"}</strong>
             </div>
-            <div class="readings">
-              <div class="reading">
-                <span>Preset</span>
-                <strong>${this.entityStateText(entities.preset) || this.entityStateText(entities.mode) || "Manual"}</strong>
-              </div>
-              <div class="reading">
-                <span>Temp</span>
-                <strong>${this.entityStateText(entities.current_temperature) || this.entityStateText(entities.cooking_temperature) || "-"}</strong>
-              </div>
-              <div class="reading">
-                <span>Time</span>
-                <strong>${this.entityStateText(entities.remaining_time) || this.entityStateText(entities.cooking_time) || "-"}</strong>
-              </div>
+            <div class="reading">
+              <span>Temp</span>
+              <strong>${this.entityStateText(entities.current_temperature) || this.entityStateText(entities.cooking_temperature) || "-"}</strong>
+            </div>
+            <div class="reading">
+              <span>Time</span>
+              <strong>${this.entityStateText(entities.remaining_time) || this.entityStateText(entities.cooking_time) || "-"}</strong>
             </div>
           </div>
 
@@ -607,7 +607,16 @@ class ProscenicAirFryerCard extends HTMLElement {
       slider.addEventListener("change", (event) => this.setNumber(slider.dataset.number, Number(event.target.value)));
     });
     this.querySelectorAll("[data-preset]").forEach((select) => {
-      select.addEventListener("change", (event) => this.selectPreset(select.dataset.preset, event.target.value));
+      select.addEventListener("focus", () => this._deferRender = true);
+      select.addEventListener("pointerdown", () => this._deferRender = true);
+      select.addEventListener("change", (event) => {
+        this._deferRender = false;
+        this.selectPreset(select.dataset.preset, event.target.value);
+      });
+      select.addEventListener("blur", () => {
+        this._deferRender = false;
+        this.render();
+      });
     });
     this.querySelectorAll("[data-more-info]").forEach((button) => {
       button.addEventListener("click", () => this.moreInfo(button.dataset.moreInfo));
@@ -658,6 +667,11 @@ class ProscenicAirFryerCard extends HTMLElement {
       .then(() => sleep(150))
       .catch((err) => console.error("Proscenic Air Fryer Card command failed:", err));
     return this._queue;
+  }
+
+  _hasOpenNativeSelect() {
+    const active = this.ownerDocument?.activeElement;
+    return active instanceof HTMLSelectElement && this.contains(active);
   }
 
   stateObj(entityId) {
@@ -724,58 +738,33 @@ class ProscenicAirFryerCard extends HTMLElement {
         background: color-mix(in srgb, var(--warning-color, #ff9800) 24%, transparent);
         border-color: color-mix(in srgb, var(--warning-color, #ff9800) 52%, var(--divider-color));
       }
-      .hero {
-        display: grid;
-        grid-template-columns: 96px 1fr;
-        gap: 14px;
-        align-items: center;
-      }
-      .dial {
-        width: 96px;
-        height: 96px;
-        border-radius: 24px;
-        display: grid;
-        place-items: center;
-        background: linear-gradient(145deg, color-mix(in srgb, var(--primary-color) 18%, var(--card-background-color)), var(--card-background-color));
-        border: 1px solid var(--divider-color);
-      }
-      .dial ha-icon {
-        --mdc-icon-size: 48px;
-        color: var(--primary-color);
-      }
-      .dial.active {
-        background: linear-gradient(145deg, color-mix(in srgb, var(--warning-color, #ff9800) 32%, var(--card-background-color)), var(--card-background-color));
-      }
-      .dial.active ha-icon {
-        color: var(--warning-color, #ff9800);
-      }
       .readings {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+        gap: 8px;
       }
       .reading,
       .secondary button {
         min-width: 0;
-        min-height: 70px;
+        min-height: 42px;
         border: 1px solid var(--divider-color);
-        border-radius: 10px;
+        border-radius: 8px;
         background: color-mix(in srgb, var(--card-background-color) 88%, var(--primary-text-color));
-        padding: 12px;
+        padding: 8px 10px;
       }
       .reading span,
       .secondary span {
         display: block;
         color: var(--secondary-text-color);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
       }
       .reading strong,
       .secondary strong {
         display: block;
         overflow-wrap: anywhere;
-        margin-top: 4px;
-        font-size: 16px;
+        margin-top: 2px;
+        font-size: 15px;
         line-height: 1.2;
       }
       .controls {
@@ -871,16 +860,6 @@ class ProscenicAirFryerCard extends HTMLElement {
         color: var(--primary-text-color);
       }
       @media (max-width: 520px) {
-        .header,
-        .hero {
-          grid-template-columns: 1fr;
-          display: grid;
-        }
-        .dial {
-          width: 76px;
-          height: 76px;
-          border-radius: 18px;
-        }
         .readings,
         .controls,
         .secondary {
