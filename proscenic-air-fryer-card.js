@@ -1,5 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
+const CARD_VERSION = "0.1.1";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -70,6 +71,7 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
       type: `custom:${CARD_NAME}`,
       title: "Air Fryer",
       device_id: "",
+      fryer_entity: "",
       status_entity: "",
       device: "",
       show_keep_warm: true,
@@ -113,10 +115,11 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
         <ha-textfield id="title" label="Card title"></ha-textfield>
         <ha-device-picker id="device_id" label="Air fryer device"></ha-device-picker>
+        <ha-entity-picker id="fryer_entity" label="Pick any fryer entity" allow-custom-entity></ha-entity-picker>
         <ha-entity-picker id="status_entity" label="Status sensor fallback"></ha-entity-picker>
         <ha-textfield id="device" label="Entity prefix fallback"></ha-textfield>
         <div class="hint">
-          Select the fryer device when possible. Entity overrides are only needed if your entities do not belong to the same Home Assistant device.
+          Version ${CARD_VERSION}. Select the fryer device when possible, or pick any fryer entity and the card will use its Home Assistant device.
         </div>
 
         <div class="section">
@@ -149,6 +152,21 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
     q("#device_id").addEventListener("value-changed", (event) => {
       this._emit({ device_id: event.detail?.value || "" });
     });
+    q("#fryer_entity").addEventListener("value-changed", (event) => {
+      const entity = event.detail?.value || "";
+      const deviceId = this._hass?.entities?.[entity]?.device_id || "";
+      const prefix = prefixFromStatusEntity(entity);
+      this._emit({
+        fryer_entity: entity,
+        ...(deviceId ? { device_id: deviceId } : {}),
+        ...(prefix ? { status_entity: entity, device: prefix } : {}),
+      });
+      if (deviceId) q("#device_id").value = deviceId;
+      if (prefix) {
+        q("#status_entity").value = entity;
+        q("#device").value = prefix;
+      }
+    });
     q("#status_entity").addEventListener("value-changed", (event) => {
       const entity = event.detail?.value || "";
       const prefix = prefixFromStatusEntity(entity);
@@ -176,6 +194,11 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
     if (devicePicker) {
       devicePicker.hass = this._hass;
       devicePicker.value = this._config.device_id || "";
+    }
+    const fryerEntityPicker = this.querySelector("#fryer_entity");
+    if (fryerEntityPicker) {
+      fryerEntityPicker.hass = this._hass;
+      fryerEntityPicker.value = this._config.fryer_entity || "";
     }
     CONFIG_FIELDS.forEach(([field, , domains]) => {
       const picker = this.querySelector(`#${field}`);
@@ -206,6 +229,7 @@ class ProscenicAirFryerCard extends HTMLElement {
       type: `custom:${CARD_NAME}`,
       title: "Air Fryer",
       device_id: "",
+      fryer_entity: "",
       status_entity: "",
       show_keep_warm: true,
       show_delayed: true,
@@ -220,6 +244,7 @@ class ProscenicAirFryerCard extends HTMLElement {
     this._config = {
       title: "Air Fryer",
       device_id: "",
+      fryer_entity: "",
       status_entity: "",
       device: "",
       show_keep_warm: true,
@@ -251,11 +276,11 @@ class ProscenicAirFryerCard extends HTMLElement {
     if (!this._hass || !this._config) return;
 
     const entities = this.entities();
-    const hasDevice = !!this._config.device_id || !!this.devicePrefix() || !!this._config.status_entity;
+    const hasDevice = !!this.effectiveDeviceId() || !!this.devicePrefix() || !!this._config.status_entity;
     if (!hasDevice) {
       this.innerHTML = `
         <ha-card>
-          <div class="warn">Proscenic Air Fryer Card: select the fryer device in the visual editor.</div>
+          <div class="warn">Proscenic Air Fryer Card ${CARD_VERSION}: select the fryer device or pick any fryer entity in the visual editor.</div>
           <style>.warn{padding:16px;color:var(--error-color);font-weight:700;}</style>
         </ha-card>
       `;
@@ -372,12 +397,16 @@ class ProscenicAirFryerCard extends HTMLElement {
   }
 
   deviceEntityIds() {
-    const deviceId = this._config.device_id;
+    const deviceId = this.effectiveDeviceId();
     if (!deviceId || !this._hass?.entities) return [];
     return Object.entries(this._hass.entities)
       .filter(([, info]) => info?.device_id === deviceId)
       .map(([entityId]) => entityId)
       .filter((entityId) => this._hass.states[entityId]);
+  }
+
+  effectiveDeviceId() {
+    return this._config.device_id || this._hass?.entities?.[this._config.fryer_entity]?.device_id || "";
   }
 
   findDeviceEntity(domain, suffixes, entityIds) {
@@ -815,7 +844,7 @@ if (!customElements.get(CARD_NAME)) {
   window.customCards.push({
     type: CARD_NAME,
     name: "Proscenic Air Fryer Card",
-    description: "Control and monitor a Proscenic air fryer.",
+    description: `Control and monitor a Proscenic air fryer. Version ${CARD_VERSION}.`,
     preview: true,
   });
 }
