@@ -1,6 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
-const CARD_VERSION = "0.1.1";
+const CARD_VERSION = "0.1.2";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -51,6 +51,9 @@ const prefixFromStatusEntity = (entityId) => {
   const match = String(entityId || "").match(/^sensor\.(.+)_status$/);
   return match ? match[1] : "";
 };
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
 const formatState = (state) => {
   if (!state) return "Unknown";
@@ -114,12 +117,14 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
         </style>
 
         <ha-textfield id="title" label="Card title"></ha-textfield>
-        <ha-device-picker id="device_id" label="Air fryer device"></ha-device-picker>
+        <ha-select id="device_id" label="Air fryer device" fixedMenuPosition naturalMenuWidth>
+          <mwc-list-item value="">Pick a device</mwc-list-item>
+        </ha-select>
         <ha-entity-picker id="fryer_entity" label="Pick any fryer entity" allow-custom-entity></ha-entity-picker>
         <ha-entity-picker id="status_entity" label="Status sensor fallback"></ha-entity-picker>
         <ha-textfield id="device" label="Entity prefix fallback"></ha-textfield>
         <div class="hint">
-          Version ${CARD_VERSION}. Select the fryer device when possible, or pick any fryer entity and the card will use its Home Assistant device.
+          Version ${CARD_VERSION}. Pick the fryer device, or pick any fryer entity and the card will use its Home Assistant device.
         </div>
 
         <div class="section">
@@ -149,8 +154,14 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
     q("#title").addEventListener("input", (event) => this._emit({ title: event.target.value }));
     q("#device").addEventListener("input", (event) => this._emit({ device: event.target.value }));
-    q("#device_id").addEventListener("value-changed", (event) => {
-      this._emit({ device_id: event.detail?.value || "" });
+    q("#device_id").addEventListener("selected", (event) => {
+      this._emit({ device_id: event.detail?.item?.value || "" });
+    });
+    q("#device_id").addEventListener("closed", (event) => {
+      this._emit({ device_id: event.target.value || "" });
+    });
+    q("#device_id").addEventListener("change", (event) => {
+      this._emit({ device_id: event.target.value || "" });
     });
     q("#fryer_entity").addEventListener("value-changed", (event) => {
       const entity = event.detail?.value || "";
@@ -190,11 +201,7 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
   _configurePickers() {
     if (!this._hass) return;
-    const devicePicker = this.querySelector("#device_id");
-    if (devicePicker) {
-      devicePicker.hass = this._hass;
-      devicePicker.value = this._config.device_id || "";
-    }
+    this._configureDeviceSelect();
     const fryerEntityPicker = this.querySelector("#fryer_entity");
     if (fryerEntityPicker) {
       fryerEntityPicker.hass = this._hass;
@@ -207,6 +214,58 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
       picker.includeDomains = domains;
       picker.value = this._config[field] || "";
     });
+  }
+
+  _configureDeviceSelect() {
+    const select = this.querySelector("#device_id");
+    if (!select) return;
+
+    const options = this._deviceOptions();
+    const selected = this._config.device_id || "";
+    select.innerHTML = `
+      <mwc-list-item value="">Pick a device</mwc-list-item>
+      ${options
+        .map(
+          ({ id, name }) =>
+            `<mwc-list-item value="${escapeHtml(id)}"${id === selected ? " selected" : ""}>${escapeHtml(name)}</mwc-list-item>`
+        )
+        .join("")}
+    `;
+    select.value = selected;
+  }
+
+  _deviceOptions() {
+    if (!this._hass?.entities) return [];
+
+    const allDeviceIds = new Set();
+    const proscenicDeviceIds = new Set();
+
+    Object.entries(this._hass.entities).forEach(([entityId, info]) => {
+      const deviceId = info?.device_id;
+      if (!deviceId) return;
+      allDeviceIds.add(deviceId);
+      if (info.platform === "proscenic_air_fryer" || this._looksLikeFryerEntity(entityId)) {
+        proscenicDeviceIds.add(deviceId);
+      }
+    });
+
+    const deviceIds = proscenicDeviceIds.size ? proscenicDeviceIds : allDeviceIds;
+    return [...deviceIds]
+      .map((id) => ({ id, name: this._deviceName(id) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  _looksLikeFryerEntity(entityId) {
+    return Object.values(ENTITY_SUFFIXES).some(([domain, suffix]) => entityId === `${domain}.${this._config.device}_${suffix}`);
+  }
+
+  _deviceName(deviceId) {
+    const device = this._hass?.devices?.[deviceId] || {};
+    const registryName = device.name_by_user || device.name;
+    if (registryName) return registryName;
+
+    const entity = Object.entries(this._hass?.entities || {}).find(([, info]) => info?.device_id === deviceId)?.[0];
+    return this._hass?.states?.[entity]?.attributes?.friendly_name || deviceId;
   }
 }
 

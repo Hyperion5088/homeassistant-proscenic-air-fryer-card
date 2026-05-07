@@ -35,9 +35,9 @@ title: Air Fryer
 device_id: 0123456789abcdef0123456789abcdef
 ```
 
-The visual editor lets you select the fryer device directly. The card then discovers the integration entities attached to that Home Assistant device.
+The visual editor includes an air fryer device dropdown. The card then discovers the integration entities attached to that Home Assistant device.
 
-If the device picker is not available in your Home Assistant frontend, use **Pick any fryer entity** in the visual editor. The card will read that entity's owning device and use the same discovery path.
+If the device dropdown does not list the fryer, use **Pick any fryer entity** in the visual editor. The card will read that entity's owning device and use the same discovery path.
 
 You can also use the status sensor fallback. For example, `sensor.t21_status` maps to entities such as:
 
