@@ -32,10 +32,12 @@ type: custom:proscenic-air-fryer-card
 ```yaml
 type: custom:proscenic-air-fryer-card
 title: Air Fryer
-status_entity: sensor.t21_status
+device_id: 0123456789abcdef0123456789abcdef
 ```
 
-The card derives the rest of the entities from the selected status sensor prefix. For example, `sensor.t21_status` maps to entities such as:
+The visual editor lets you select the fryer device directly. The card then discovers the integration entities attached to that Home Assistant device.
+
+You can also use the status sensor fallback. For example, `sensor.t21_status` maps to entities such as:
 
 - `switch.t21_power`
 - `button.t21_start_cooking`
@@ -45,7 +47,7 @@ The card derives the rest of the entities from the selected status sensor prefix
 - `sensor.t21_current_temperature`
 - `sensor.t21_remaining_time`
 
-If your entity IDs are different, use the visual editor to set individual entity overrides.
+If your entities are not attached to the same Home Assistant device or use different IDs, use the visual editor to set individual entity overrides.
 
 ## Features
 

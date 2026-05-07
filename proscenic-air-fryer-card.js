@@ -69,6 +69,7 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
     this._config = {
       type: `custom:${CARD_NAME}`,
       title: "Air Fryer",
+      device_id: "",
       status_entity: "",
       device: "",
       show_keep_warm: true,
@@ -111,10 +112,11 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
         </style>
 
         <ha-textfield id="title" label="Card title"></ha-textfield>
-        <ha-entity-picker id="status_entity" label="Status sensor"></ha-entity-picker>
+        <ha-device-picker id="device_id" label="Air fryer device"></ha-device-picker>
+        <ha-entity-picker id="status_entity" label="Status sensor fallback"></ha-entity-picker>
         <ha-textfield id="device" label="Entity prefix fallback"></ha-textfield>
         <div class="hint">
-          Select the status sensor when possible. The card derives the entity prefix from names like <code>sensor.t21_status</code>.
+          Select the fryer device when possible. Entity overrides are only needed if your entities do not belong to the same Home Assistant device.
         </div>
 
         <div class="section">
@@ -144,6 +146,9 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
     q("#title").addEventListener("input", (event) => this._emit({ title: event.target.value }));
     q("#device").addEventListener("input", (event) => this._emit({ device: event.target.value }));
+    q("#device_id").addEventListener("value-changed", (event) => {
+      this._emit({ device_id: event.detail?.value || "" });
+    });
     q("#status_entity").addEventListener("value-changed", (event) => {
       const entity = event.detail?.value || "";
       const prefix = prefixFromStatusEntity(entity);
@@ -167,6 +172,11 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
   _configurePickers() {
     if (!this._hass) return;
+    const devicePicker = this.querySelector("#device_id");
+    if (devicePicker) {
+      devicePicker.hass = this._hass;
+      devicePicker.value = this._config.device_id || "";
+    }
     CONFIG_FIELDS.forEach(([field, , domains]) => {
       const picker = this.querySelector(`#${field}`);
       if (!picker) return;
@@ -195,6 +205,7 @@ class ProscenicAirFryerCard extends HTMLElement {
     return {
       type: `custom:${CARD_NAME}`,
       title: "Air Fryer",
+      device_id: "",
       status_entity: "",
       show_keep_warm: true,
       show_delayed: true,
@@ -208,6 +219,7 @@ class ProscenicAirFryerCard extends HTMLElement {
     }
     this._config = {
       title: "Air Fryer",
+      device_id: "",
       status_entity: "",
       device: "",
       show_keep_warm: true,
@@ -238,18 +250,18 @@ class ProscenicAirFryerCard extends HTMLElement {
   render() {
     if (!this._hass || !this._config) return;
 
-    const prefix = this.devicePrefix();
-    if (!prefix && !this._config.status_entity) {
+    const entities = this.entities();
+    const hasDevice = !!this._config.device_id || !!this.devicePrefix() || !!this._config.status_entity;
+    if (!hasDevice) {
       this.innerHTML = `
         <ha-card>
-          <div class="warn">Proscenic Air Fryer Card: select the fryer status sensor in the visual editor.</div>
+          <div class="warn">Proscenic Air Fryer Card: select the fryer device in the visual editor.</div>
           <style>.warn{padding:16px;color:var(--error-color);font-weight:700;}</style>
         </ha-card>
       `;
       return;
     }
 
-    const entities = this.entities();
     const statusState = this.stateObj(entities.status);
     const status = String(statusState?.state || "unknown");
     const isActive = ["cooking", "appointment", "warm"].includes(status);
@@ -327,12 +339,15 @@ class ProscenicAirFryerCard extends HTMLElement {
 
   entities() {
     const prefix = this.devicePrefix();
+    const deviceEntityIds = this.deviceEntityIds();
     const bySuffix = (key) => {
       const configured = this._config[`${key}_entity`];
       if (configured) return configured;
       const suffix = ENTITY_SUFFIXES[key];
-      if (!prefix || !suffix) return "";
       const domain = suffix[0];
+      const fromDevice = this.findDeviceEntity(domain, suffix.slice(1), deviceEntityIds);
+      if (fromDevice) return fromDevice;
+      if (!prefix || !suffix) return "";
       for (const part of suffix.slice(1)) {
         const entityId = `${domain}.${prefix}_${part}`;
         if (this._hass.states[entityId]) return entityId;
@@ -354,6 +369,35 @@ class ProscenicAirFryerCard extends HTMLElement {
       keep_warm: this._config.keep_warm_entity || bySuffix("keep_warm"),
       warm_time: this._config.warm_time_entity || bySuffix("warm_time"),
     };
+  }
+
+  deviceEntityIds() {
+    const deviceId = this._config.device_id;
+    if (!deviceId || !this._hass?.entities) return [];
+    return Object.entries(this._hass.entities)
+      .filter(([, info]) => info?.device_id === deviceId)
+      .map(([entityId]) => entityId)
+      .filter((entityId) => this._hass.states[entityId]);
+  }
+
+  findDeviceEntity(domain, suffixes, entityIds) {
+    const candidates = entityIds.filter((entityId) => entityId.startsWith(`${domain}.`));
+    for (const suffix of suffixes) {
+      const exact = candidates.find((entityId) => entityId.endsWith(`_${suffix}`));
+      if (exact) return exact;
+    }
+    for (const suffix of suffixes) {
+      const target = this.cleanName(suffix);
+      const match = candidates.find((entityId) => this.cleanName(this.entityLabel(entityId)).includes(target));
+      if (match) return match;
+    }
+    return "";
+  }
+
+  entityLabel(entityId) {
+    const state = this.stateObj(entityId);
+    const info = this._hass?.entities?.[entityId];
+    return state?.attributes?.friendly_name || info?.name || info?.original_name || entityId;
   }
 
   renderPreset(entities) {
@@ -527,6 +571,13 @@ class ProscenicAirFryerCard extends HTMLElement {
     if (state.state === "unknown" || state.state === "unavailable") return state.state;
     const unit = state.attributes?.unit_of_measurement;
     return `${state.state}${unit ? ` ${unit}` : ""}`;
+  }
+
+  cleanName(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   }
 
   styles() {
