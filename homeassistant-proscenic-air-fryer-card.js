@@ -1,6 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
-const CARD_VERSION = "0.1.6";
+const CARD_VERSION = "0.1.7";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -336,7 +336,7 @@ class ProscenicAirFryerCard extends HTMLElement {
   getGridOptions() {
     return {
       columns: 12,
-      min_columns: 6,
+      min_columns: 8,
       rows: 6,
       min_rows: 4,
     };
@@ -751,16 +751,17 @@ class ProscenicAirFryerCard extends HTMLElement {
       }
       .readings {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
         gap: 10px;
       }
       .reading,
       .secondary button {
         min-width: 0;
+        min-height: 70px;
         border: 1px solid var(--divider-color);
         border-radius: 10px;
         background: color-mix(in srgb, var(--card-background-color) 88%, var(--primary-text-color));
-        padding: 10px;
+        padding: 12px;
       }
       .reading span,
       .secondary span {
@@ -772,11 +773,10 @@ class ProscenicAirFryerCard extends HTMLElement {
       .reading strong,
       .secondary strong {
         display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow-wrap: anywhere;
         margin-top: 4px;
         font-size: 16px;
+        line-height: 1.2;
       }
       .controls {
         display: grid;
@@ -863,7 +863,7 @@ class ProscenicAirFryerCard extends HTMLElement {
       }
       .secondary {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
         gap: 10px;
       }
       .secondary button {
