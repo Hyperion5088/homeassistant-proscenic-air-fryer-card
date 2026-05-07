@@ -17,10 +17,10 @@ Status: beta. This card is designed around the tested Proscenic T21 entity set a
 
 The card is published through versioned beta releases so HACS can show a release version instead of a branch commit.
 
-HACS serves the card from:
+HACS serves the card entrypoint from:
 
 ```text
-/hacsfiles/homeassistant-proscenic-air-fryer-card/proscenic-air-fryer-card.js
+/hacsfiles/homeassistant-proscenic-air-fryer-card/homeassistant-proscenic-air-fryer-card.js
 ```
 
 The custom card type is:
