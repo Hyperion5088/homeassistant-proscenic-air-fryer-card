@@ -15,6 +15,8 @@ Status: beta. This card is designed around the tested Proscenic T21 entity set a
 3. Install `Proscenic Air Fryer Card`.
 4. Refresh the browser after HACS adds the dashboard resource.
 
+The card is published through versioned beta releases so HACS can show a release version instead of a branch commit.
+
 HACS serves the card from:
 
 ```text

@@ -1,6 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
-const CARD_VERSION = "0.1.3";
+const CARD_VERSION = "0.1.4";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
