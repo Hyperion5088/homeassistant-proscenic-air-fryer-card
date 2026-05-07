@@ -1,6 +1,6 @@
 const CARD_NAME = "proscenic-air-fryer-card";
 const EDITOR_NAME = "proscenic-air-fryer-card-editor";
-const CARD_VERSION = "0.1.2";
+const CARD_VERSION = "0.1.3";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -112,14 +112,31 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
           .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
           .section { display:grid; gap:10px; }
           .section h3 { margin:0; font-size:14px; font-weight:700; opacity:.86; }
+          label { display:grid; gap:6px; font-size:12px; color:var(--secondary-text-color); }
+          select {
+            width:100%;
+            min-height:56px;
+            box-sizing:border-box;
+            padding:0 12px;
+            border:1px solid var(--divider-color);
+            border-radius:4px;
+            color:var(--primary-text-color);
+            background:var(--card-background-color);
+            font:inherit;
+            outline:none;
+          }
+          select:focus { border-color:var(--primary-color); box-shadow:0 0 0 1px var(--primary-color); }
           .hint { font-size:12px; opacity:.72; line-height:1.4; }
           @media (max-width: 640px) { .grid { grid-template-columns:1fr; } }
         </style>
 
         <ha-textfield id="title" label="Card title"></ha-textfield>
-        <ha-select id="device_id" label="Air fryer device" fixedMenuPosition naturalMenuWidth>
-          <mwc-list-item value="">Pick a device</mwc-list-item>
-        </ha-select>
+        <label>
+          Air fryer device
+          <select id="device_id">
+            <option value="">Pick a device</option>
+          </select>
+        </label>
         <ha-entity-picker id="fryer_entity" label="Pick any fryer entity" allow-custom-entity></ha-entity-picker>
         <ha-entity-picker id="status_entity" label="Status sensor fallback"></ha-entity-picker>
         <ha-textfield id="device" label="Entity prefix fallback"></ha-textfield>
@@ -154,12 +171,6 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
 
     q("#title").addEventListener("input", (event) => this._emit({ title: event.target.value }));
     q("#device").addEventListener("input", (event) => this._emit({ device: event.target.value }));
-    q("#device_id").addEventListener("selected", (event) => {
-      this._emit({ device_id: event.detail?.item?.value || "" });
-    });
-    q("#device_id").addEventListener("closed", (event) => {
-      this._emit({ device_id: event.target.value || "" });
-    });
     q("#device_id").addEventListener("change", (event) => {
       this._emit({ device_id: event.target.value || "" });
     });
@@ -223,11 +234,11 @@ class ProscenicAirFryerCardEditor extends HTMLElement {
     const options = this._deviceOptions();
     const selected = this._config.device_id || "";
     select.innerHTML = `
-      <mwc-list-item value="">Pick a device</mwc-list-item>
+      <option value="">Pick a device</option>
       ${options
         .map(
           ({ id, name }) =>
-            `<mwc-list-item value="${escapeHtml(id)}"${id === selected ? " selected" : ""}>${escapeHtml(name)}</mwc-list-item>`
+            `<option value="${escapeHtml(id)}"${id === selected ? " selected" : ""}>${escapeHtml(name)}</option>`
         )
         .join("")}
     `;
